@@ -8,7 +8,7 @@ config-zip` call — no Functions Core Tools needed.
 
 ```bash
 RG=rg-func-helloworld-demo
-LOC=eastus2
+LOC=westeurope
 STORAGE=sthellofuncdemo$RANDOM
 FUNCAPP=func-helloworld-demo-$RANDOM
 

@@ -6,11 +6,6 @@ required.
 
 - [`hello-world/`](hello-world/) — simplest possible Azure Function, sanity
   check that deploy tooling works.
-- [`identity-abuse-demo/`](identity-abuse-demo/) — command injection in a
-  Function's HTTP endpoint leads to abuse of an over-privileged
-  (Contributor-scoped) system-assigned managed identity. Pairs with the
-  Kubernetes over-privileged ServiceAccount demo — same lesson, different
-  compute.
 - [`keyvault-secret-leak-demo/`](keyvault-secret-leak-demo/) — a Function
   legitimately reads a Key Vault secret via its managed identity and never
   returns it, but an unrelated command-injection bug in the same process

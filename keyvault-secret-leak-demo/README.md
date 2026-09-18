@@ -21,7 +21,7 @@ API, with no `az login` and no Key Vault RBAC grant to the attacker at all.
 | Resource | Value |
 |---|---|
 | Subscription | `QaVerify SetupCheck - Sub` (`9d8d5a47-4453-42f7-840f-648c01ed5308`) |
-| Resource group | `rg-func-kv-leak-lab` (region `eastus2`) |
+| Resource group | `rg-func-kv-leak-lab` (region `westeurope`) |
 | Function App | `func-kv-leak-lab-24693` (Linux, Python 3.11, Consumption plan) |
 | Key Vault | `kv-leak-lab-15482`, RBAC authorization mode |
 | Secret | `db-password` = `DEMO-FAKE-DB-PW-not-a-real-secret-4f9a2c` (fake demo value) |
@@ -65,7 +65,7 @@ does **not** run a remote pip build, even with
 
 ```bash
 RG=rg-func-kv-leak-lab
-LOC=eastus2
+LOC=westeurope
 STORAGE=stfunckvleak$RANDOM
 FUNCAPP=func-kv-leak-lab-$RANDOM
 KV=kv-leak-lab-$RANDOM
@@ -175,9 +175,8 @@ REST API.
 - **Rotate secrets Functions can read, and monitor Key Vault access logs**
   for reads that don't correlate with an actual app code path — that's the
   detection signal for exactly this attack.
-- **Same lesson as the Kubernetes ServiceAccount and Contributor-identity
-  demos**: the managed identity itself isn't the flaw — what it's allowed
-  to reach is.
+- **Same lesson as the Kubernetes over-privileged ServiceAccount demo**: the
+  managed identity itself isn't the flaw — what it's allowed to reach is.
 
 ## Cleanup
 
