@@ -11,3 +11,9 @@ required.
   (Contributor-scoped) system-assigned managed identity. Pairs with the
   Kubernetes over-privileged ServiceAccount demo — same lesson, different
   compute.
+- [`keyvault-secret-leak-demo/`](keyvault-secret-leak-demo/) — a Function
+  legitimately reads a Key Vault secret via its managed identity and never
+  returns it, but an unrelated command-injection bug in the same process
+  lets an attacker steal the identity's token and read the secret directly
+  from Key Vault, bypassing the app's own logic entirely. Tested end to end
+  with a real (fake-value) secret.
