@@ -48,6 +48,14 @@ process inherits the same identity and the same access.
 
 ## Deploy
 
+Clone the repo and enter the demo directory first — the zip step below packs the
+current directory, so running it from anywhere else uploads the wrong files.
+
+```bash
+git clone https://github.com/CyberstepsDE/azure-functions-demos.git
+cd azure-functions-demos/keyvault-secret-leak-demo
+```
+
 The Python packages (`azure-identity`, `azure-keyvault-secrets`) must be
 vendored into the zip — `az functionapp deployment source config-zip` uses
 a "run from package" blob path for Linux Python Consumption apps that does

@@ -7,6 +7,14 @@ no Functions Core Tools needed.
 
 ## Deploy
 
+Clone the repo and enter the demo directory first — the zip step below packs the
+current directory, so running it from anywhere else uploads the wrong files.
+
+```bash
+git clone https://github.com/CyberstepsDE/azure-functions-demos.git
+cd azure-functions-demos/hello-world
+```
+
 ```bash
 RG=rg-func-helloworld-demo
 LOC=westeurope
